@@ -9,9 +9,8 @@ profile. The project is structured around eight phases, three modelling
 approaches, and a strength standards tool that a coach or athlete can run
 interactively.
 
-**Status:** Phases 1–2 complete. Phase 3 in progress (OLS and gradient
-descent done; Ridge, Lasso, and sklearn validation pending). Phases 4–8
-planned.
+**Status:** Phases 1–3 complete. Phase 4 (Evaluation & Analysis) next.
+Phases 5–8 planned.
 
 **Data:** OpenPowerlifting, 2026-08-01 release (CC BY 4.0).
 Fetch instructions below — the raw CSV is not committed (> 700 MB).
@@ -36,7 +35,7 @@ Fetch instructions below — the raw CSV is not committed (> 700 MB).
 
 ## Phase Overview
 
-### Phase 1 — EDA & Cleaning
+### Phase 1 — EDA & Cleaning ✓
 **Goal:** define a clean, well-characterised modelling cohort and understand
 the data's structure.
 
@@ -52,7 +51,7 @@ Balkan peers on all four targets.
 
 ---
 
-### Phase 2 — Feature Engineering & Preprocessing
+### Phase 2 — Feature Engineering & Preprocessing ✓
 **Goal:** turn the cohort into leakage-free, well-conditioned feature matrices
 ready for modelling.
 
@@ -68,7 +67,7 @@ check).
 
 ---
 
-### Phase 3 — Classical Regression *(in progress)*
+### Phase 3 — Classical Regression ✓
 **Goal:** implement linear regression from first principles and validate it.
 
 **Motivation:** implementing OLS, gradient descent, Ridge, and Lasso from
@@ -77,20 +76,23 @@ validating against sklearn confirms correctness.
 
 **Approach:** normal equation via `np.linalg.lstsq`, then batch gradient
 descent verified to converge to the same solution (< 0.001 kg difference),
-then Ridge and Lasso from scratch, then sklearn validation. *(Ridge/Lasso
-and sklearn validation pending.)*
+then Ridge and Lasso from scratch, then sklearn validation confirming all
+implementations match to four decimal places. Ridge does not improve over OLS
+(condition number 3.3 — well-conditioned matrix); Lasso retains all features
+with one exception: age-augmented TotalKg, where Lasso finds a real optimum
+at λ = 1.79 and improves RMSE by 0.11 kg.
 
 ---
 
 ### Phases 4–8 *(planned)*
 
-| Phase | Title |
-|-------|-------|
-| 4 | Evaluation & Analysis |
-| 5 | Gradient Boosting |
-| 6 | Bayesian Ridge — Coverage & Calibration Curves |
-| 7 | Uncertainty Quantification |
-| 8 | Strength Standards Tool |
+| Phase | Title | Notes |
+|-------|-------|-------|
+| 4 | Evaluation & Analysis | Cross-validated evaluation with stratified and lifter-grouped k-fold to quantify repeated-measures leakage |
+| 5 | Gradient Boosting | |
+| 6 | Bayesian Ridge — Coverage & Calibration Curves | |
+| 7 | Uncertainty Quantification | |
+| 8 | Strength Standards Tool | Interactive tool for coaches and athletes |
 
 ---
 
@@ -134,7 +136,7 @@ individual cells out of order.
 
 ---
 
-## Key Results (Phases 1–3, partial)
+## Key Results
 
 | Model | Cohort | Features | Test RMSE |
 |-------|--------|----------|-----------|
@@ -145,7 +147,12 @@ individual cells out of order.
 | OLS (normal equation) | Total | + Age | 87.1 kg |
 | Gradient descent | Total | Base | 93.2 kg |
 | Gradient descent | Total | + Age | 87.1 kg |
+| Ridge (optimal λ) | Total | Base | 93.2 kg |
+| Ridge (optimal λ) | Total | + Age | 87.1 kg |
+| Lasso (optimal λ) | Total | Base | 93.2 kg |
+| Lasso (optimal λ = 1.79) | Total | + Age | **87.0 kg** |
 
+All scratch implementations validated against sklearn to four decimal places.
 Per-lift (squat / bench / deadlift) results available in the notebook.
 
 ---
