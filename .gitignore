@@ -1,4 +1,4 @@
-data/openpowerlifting-*.csv
+data/
 openpowerlifting-latest.zip
 __pycache__/
 .ipynb_checkpoints/
