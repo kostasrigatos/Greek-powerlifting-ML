@@ -9,8 +9,8 @@ profile. The project is structured around eight phases, three modelling
 approaches, and a strength standards tool that a coach or athlete can run
 interactively.
 
-**Status:** Phases 1–3 complete. Phase 4 (Evaluation & Analysis) next.
-Phases 5–8 planned.
+**Status:** Phases 1–4 complete. Phase 5 (Gradient Boosting) next.
+Phases 6–8 planned.
 
 **Data:** OpenPowerlifting, 2026-08-01 release (CC BY 4.0).
 Fetch instructions below — the raw CSV is not committed (> 700 MB).
@@ -26,7 +26,8 @@ Fetch instructions below — the raw CSV is not committed (> 700 MB).
 ├── plots/
 │   ├── phase1/                         ← EDA figures
 │   ├── phase2/                         ← preprocessing figures
-│   └── phase3/                         ← regression figures
+│   ├── phase3/                         ← regression figures
+│   └── phase4/                         ← evaluation figures
 └── data/
     └── (raw CSV not committed — see below)
 ```
@@ -80,16 +81,51 @@ then Ridge and Lasso from scratch, then sklearn validation confirming all
 implementations match to four decimal places. Ridge does not improve over OLS
 (condition number 3.3 — well-conditioned matrix); Lasso retains all features
 with one exception: age-augmented TotalKg, where Lasso finds a real optimum
-at λ = 1.79 and improves RMSE by 0.11 kg.
+at λ = 1.79 and improves RMSE by 0.11 kg. Stratified and unstratified 5-fold
+CV confirm the single-split estimates are stable.
 
 ---
 
-### Phases 4–8 *(planned)*
+### Phase 4 — Evaluation & Analysis ✓
+**Goal:** move beyond a single held-out RMSE and determine where the models
+succeed, where they fail, and why — across demographic subgroups, across
+targets, and across the bias-variance spectrum.
+
+**Motivation:** an aggregate RMSE hides subgroup-level failure. A model can
+look reasonable overall while explaining almost no variance for a specific
+demographic, and a single train/test split cannot distinguish underfitting
+from overfitting.
+
+**Approach and findings:**
+- **Sex-stratified performance:** RMSE is lower for female lifters across
+  every target (smaller absolute totals), but R² is markedly worse and
+  negative for several base-feature targets (squat −0.023, bench −0.133) —
+  the model explains comparatively little of the variance within the female
+  subgroup, even though absolute errors look reasonable.
+- **Age-category performance:** the Masters subgroup is poorly explained
+  under both base (RMSE 107.1 kg, R² = 0.247) and age-augmented (RMSE
+  116.0 kg, R² = 0.038) features — consistent with small sample size
+  (33–35 rows) and within-category heterogeneity (Masters spans 40–70+)
+  rather than a missing feature.
+- **Bias-variance diagnosis:** training RMSE and CV RMSE are close across
+  every target and feature variant (gaps of 0.06–0.43 kg) — the model is in
+  a high-bias, not high-variance, regime. It is underfitting because six
+  demographic features cannot capture what actually drives performance
+  (training history, technique, competitive experience), not overfitting to
+  the training split.
+- **Residual correlation:** squat-deadlift residuals correlate most
+  strongly (0.80), squat-bench next (0.75), bench-deadlift weakest (0.69) —
+  the model's errors are shared across lifts, not independent per lift,
+  consistent with the bias finding: the same unobserved factors drive
+  under- or over-prediction across all three lifts simultaneously.
+
+---
+
+### Phases 5–8 *(planned)*
 
 | Phase | Title | Notes |
 |-------|-------|-------|
-| 4 | Evaluation & Analysis | Cross-validated evaluation with stratified and lifter-grouped k-fold to quantify repeated-measures leakage |
-| 5 | Gradient Boosting | |
+| 5 | Gradient Boosting | Learning curves (classical vs boosted) |
 | 6 | Bayesian Ridge — Coverage & Calibration Curves | |
 | 7 | Uncertainty Quantification | |
 | 8 | Strength Standards Tool | Interactive tool for coaches and athletes |
@@ -145,15 +181,16 @@ individual cells out of order.
 | Per-sex BW regression baseline | Total | — | 94.4 kg |
 | OLS (normal equation) | Total | Base | 93.2 kg |
 | OLS (normal equation) | Total | + Age | 87.1 kg |
-| Gradient descent | Total | Base | 93.2 kg |
-| Gradient descent | Total | + Age | 87.1 kg |
 | Ridge (optimal λ) | Total | Base | 93.2 kg |
 | Ridge (optimal λ) | Total | + Age | 87.1 kg |
 | Lasso (optimal λ) | Total | Base | 93.2 kg |
 | Lasso (optimal λ = 1.79) | Total | + Age | **87.0 kg** |
+| Stratified 5-fold CV, OLS | Total | Base | 92.2 ± 0.9 kg |
+| Stratified 5-fold CV, OLS | Total | + Age | 88.9 ± 2.9 kg |
 
 All scratch implementations validated against sklearn to four decimal places.
-Per-lift (squat / bench / deadlift) results available in the notebook.
+Per-lift (squat / bench / deadlift) results, subgroup breakdowns, and
+diagnostic plots available in the notebook.
 
 ---
 
