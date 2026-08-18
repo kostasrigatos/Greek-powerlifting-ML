@@ -9,8 +9,8 @@ profile. The project is structured around eight phases, three modelling
 approaches, and a strength standards tool that a coach or athlete can run
 interactively.
 
-**Status:** Phases 1–4 complete. Phase 5 (Gradient Boosting) next.
-Phases 6–8 planned.
+**Status:** Phases 1–5 complete. Phase 6 (Bayesian Ridge — Coverage &
+Calibration Curves) next. Phases 7–8 planned.
 
 **Data:** OpenPowerlifting, 2026-08-01 release (CC BY 4.0).
 Fetch instructions below — the raw CSV is not committed (> 700 MB).
@@ -27,7 +27,8 @@ Fetch instructions below — the raw CSV is not committed (> 700 MB).
 │   ├── phase1/                         ← EDA figures
 │   ├── phase2/                         ← preprocessing figures
 │   ├── phase3/                         ← regression figures
-│   └── phase4/                         ← evaluation figures
+│   ├── phase4/                         ← evaluation figures
+│   └── phase5/                         ← boosting & SHAP figures
 └── data/
     └── (raw CSV not committed — see below)
 ```
@@ -116,16 +117,54 @@ from overfitting.
 - **Residual correlation:** squat-deadlift residuals correlate most
   strongly (0.80), squat-bench next (0.75), bench-deadlift weakest (0.69) —
   the model's errors are shared across lifts, not independent per lift,
-  consistent with the bias finding: the same unobserved factors drive
-  under- or over-prediction across all three lifts simultaneously.
+  consistent with the bias finding.
 
 ---
 
-### Phases 5–8 *(planned)*
+### Phase 5 — Gradient Boosting ✓
+**Goal:** explore whether a model with more functional flexibility than a
+linear one can improve on Phase 3–4's classical results.
+
+**Motivation:** Phase 4 established the linear models were underfitting
+(high bias, not high variance). A specific mechanism was hypothesised: the
+relationship between age and performance is plausibly non-monotonic —
+young lifters improving rapidly, a plateau in the late 20s to 30s, then
+decline — a shape a linear model can only fit as a straight line, but a
+tree-based model can capture via threshold splits. This limitation is
+structural, independent of how well-conditioned the feature matrix is.
+
+**Approach and findings:**
+- **Learning curves (classical vs. boosted):** established the baseline
+  shape to compare against before any tuning effort.
+- **Baseline (untuned) XGBoost vs. OLS/Ridge:** untuned boosting already
+  beat the linear models on every target, with the largest gains
+  concentrated specifically in the age-augmented feature set (TotalKg
+  −6.67 kg vs. OLS) — the first signal that age's effect might not be
+  linear.
+- **Optuna hyperparameter tuning** (100 trials per target/variant, TPE
+  sampler, search space biased toward shallow trees to counteract
+  overfitting on a small dataset) widened these gains further: age-augmented
+  TotalKg improved by 8.98 kg over OLS. *Disclosed caveat: the search
+  optimises directly against the same CV folds used to report results — a
+  mild leakage that likely makes the reported improvement a modest
+  overestimate of true generalisation gain. A fully isolated nested-CV
+  estimate was judged not worth the added complexity for this project.*
+- **Tuned-model evaluation** via stratified 5-fold CV with a per-sex
+  breakdown tested whether boosting closes the sex-specific gaps found in
+  Phase 4.
+- **SHAP analysis** confirmed the age-nonlinearity hypothesis directly: Age
+  ranks as the third most important feature across all four targets (well
+  above the federation dummies), and SHAP dependence plots show the
+  predicted shape explicitly — a steep rise from the mid-teens through the
+  mid-20s, a plateau through the early 30s, and a consistent decline
+  thereafter, consistently across TotalKg, squat, bench, and deadlift.
+
+---
+
+### Phases 6–8 *(planned)*
 
 | Phase | Title | Notes |
 |-------|-------|-------|
-| 5 | Gradient Boosting | Learning curves (classical vs boosted) |
 | 6 | Bayesian Ridge — Coverage & Calibration Curves | |
 | 7 | Uncertainty Quantification | |
 | 8 | Strength Standards Tool | Interactive tool for coaches and athletes |
@@ -157,13 +196,15 @@ matplotlib
 seaborn
 scipy
 scikit-learn
-pathlib (standard library)
+xgboost
+optuna
+shap
 ```
 
 Install via:
 
 ```bash
-pip install numpy pandas matplotlib seaborn scipy scikit-learn
+pip install numpy pandas matplotlib seaborn scipy scikit-learn xgboost optuna shap
 ```
 
 **Run:** open `greek_powerlifting_analysis.ipynb` in JupyterLab and run all
@@ -184,13 +225,16 @@ individual cells out of order.
 | Ridge (optimal λ) | Total | Base | 93.2 kg |
 | Ridge (optimal λ) | Total | + Age | 87.1 kg |
 | Lasso (optimal λ) | Total | Base | 93.2 kg |
-| Lasso (optimal λ = 1.79) | Total | + Age | **87.0 kg** |
-| Stratified 5-fold CV, OLS | Total | Base | 92.2 ± 0.9 kg |
-| Stratified 5-fold CV, OLS | Total | + Age | 88.9 ± 2.9 kg |
+| Lasso (optimal λ = 1.79) | Total | + Age | 87.0 kg |
+| XGBoost, untuned | Total | Base | 91.5 kg |
+| XGBoost, untuned | Total | + Age | 82.2 kg |
+| XGBoost, Optuna-tuned | Total | Base | 89.1 kg |
+| XGBoost, Optuna-tuned | Total | + Age | **81.4 kg** |
 
 All scratch implementations validated against sklearn to four decimal places.
 Per-lift (squat / bench / deadlift) results, subgroup breakdowns, and
-diagnostic plots available in the notebook.
+diagnostic plots — including the SHAP age-dependence analysis — available in
+the notebook.
 
 ---
 
