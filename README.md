@@ -9,8 +9,8 @@ profile. The project is structured around eight phases, three modelling
 approaches, and a strength standards tool that a coach or athlete can run
 interactively.
 
-**Status:** Phases 1–5 complete. Phase 6 (Bayesian Ridge — Coverage &
-Calibration Curves) next. Phases 7–8 planned.
+**Status:** Phases 1–6 complete. Phase 7 (Uncertainty Quantification) next.
+Phase 8 planned.
 
 **Data:** OpenPowerlifting, 2026-08-01 release (CC BY 4.0).
 Fetch instructions below — the raw CSV is not committed (> 700 MB).
@@ -28,7 +28,8 @@ Fetch instructions below — the raw CSV is not committed (> 700 MB).
 │   ├── phase2/                         ← preprocessing figures
 │   ├── phase3/                         ← regression figures
 │   ├── phase4/                         ← evaluation figures
-│   └── phase5/                         ← boosting & SHAP figures
+│   ├── phase5/                         ← boosting & SHAP figures
+│   └── phase6/                         ← Bayesian calibration figures
 └── data/
     └── (raw CSV not committed — see below)
 ```
@@ -110,14 +111,10 @@ from overfitting.
   rather than a missing feature.
 - **Bias-variance diagnosis:** training RMSE and CV RMSE are close across
   every target and feature variant (gaps of 0.06–0.43 kg) — the model is in
-  a high-bias, not high-variance, regime. It is underfitting because six
-  demographic features cannot capture what actually drives performance
-  (training history, technique, competitive experience), not overfitting to
-  the training split.
+  a high-bias, not high-variance, regime.
 - **Residual correlation:** squat-deadlift residuals correlate most
   strongly (0.80), squat-bench next (0.75), bench-deadlift weakest (0.69) —
-  the model's errors are shared across lifts, not independent per lift,
-  consistent with the bias finding.
+  the model's errors are shared across lifts, not independent per lift.
 
 ---
 
@@ -127,45 +124,70 @@ linear one can improve on Phase 3–4's classical results.
 
 **Motivation:** Phase 4 established the linear models were underfitting
 (high bias, not high variance). A specific mechanism was hypothesised: the
-relationship between age and performance is plausibly non-monotonic —
-young lifters improving rapidly, a plateau in the late 20s to 30s, then
-decline — a shape a linear model can only fit as a straight line, but a
-tree-based model can capture via threshold splits. This limitation is
-structural, independent of how well-conditioned the feature matrix is.
+relationship between age and performance is plausibly non-monotonic — young
+lifters improving rapidly, a plateau in the late 20s to 30s, then decline —
+a shape a linear model can only fit as a straight line, but a tree-based
+model can capture via threshold splits.
 
 **Approach and findings:**
-- **Learning curves (classical vs. boosted):** established the baseline
-  shape to compare against before any tuning effort.
 - **Baseline (untuned) XGBoost vs. OLS/Ridge:** untuned boosting already
   beat the linear models on every target, with the largest gains
-  concentrated specifically in the age-augmented feature set (TotalKg
-  −6.67 kg vs. OLS) — the first signal that age's effect might not be
-  linear.
+  concentrated in the age-augmented feature set (TotalKg −6.67 kg vs. OLS).
 - **Optuna hyperparameter tuning** (100 trials per target/variant, TPE
-  sampler, search space biased toward shallow trees to counteract
-  overfitting on a small dataset) widened these gains further: age-augmented
-  TotalKg improved by 8.98 kg over OLS. *Disclosed caveat: the search
-  optimises directly against the same CV folds used to report results — a
-  mild leakage that likely makes the reported improvement a modest
-  overestimate of true generalisation gain. A fully isolated nested-CV
-  estimate was judged not worth the added complexity for this project.*
-- **Tuned-model evaluation** via stratified 5-fold CV with a per-sex
-  breakdown tested whether boosting closes the sex-specific gaps found in
-  Phase 4.
+  sampler) widened these gains further. *Disclosed caveat: the search
+  optimises against the same CV folds used to report results — a mild
+  leakage likely making the reported improvement a modest overestimate. A
+  fully isolated nested-CV estimate was judged not worth the added
+  complexity for this project.*
 - **SHAP analysis** confirmed the age-nonlinearity hypothesis directly: Age
-  ranks as the third most important feature across all four targets (well
-  above the federation dummies), and SHAP dependence plots show the
-  predicted shape explicitly — a steep rise from the mid-teens through the
+  ranks third in importance across all four targets, and SHAP dependence
+  plots show the predicted shape explicitly — a steep rise through the
   mid-20s, a plateau through the early 30s, and a consistent decline
-  thereafter, consistently across TotalKg, squat, bench, and deadlift.
+  thereafter, consistently across all four targets.
 
 ---
 
-### Phases 6–8 *(planned)*
+### Phase 6 — Bayesian Ridge: Coverage & Calibration ✓
+**Goal:** move beyond point predictions and quantify per-prediction
+uncertainty. Standard Ridge gives a single number (e.g. TotalKg = 575 kg)
+with no indication of confidence; BayesianRidge gives a mean plus a
+calibrated interval (575 ± 15 kg).
+
+**Motivation:** Phase 5 produced a model that predicts well but still
+returns only a point estimate per athlete. Useful interpretation — for a
+coach or athlete, and for the strength standards tool planned in Phase 8 —
+needs an honest sense of how much to trust that number.
+
+**Approach and findings:**
+- **BayesianRidge fitted on all eight target/variant combinations**, with
+  regularisation and noise precision estimated via evidence maximisation
+  rather than cross-validation. The noise-std estimates (e.g. 91.85 kg for
+  base TotalKg) closely match Phase 3's independently-derived CV RMSE
+  (92.17 kg) — a cross-check via a completely different method.
+- **MAP-Ridge identity verified numerically:** at matched λ, BayesianRidge
+  and Ridge coefficients agree to ~1e-12 — confirms BayesianRidge changes
+  nothing about the point prediction, only adds calibrated uncertainty
+  around it.
+- **Empirical coverage** at four nominal levels (50/68/80/95%) on the held-
+  out test set, across all eight target/variant combinations, tracked
+  nominal levels closely (within 1–5 percentage points at every level) —
+  the intervals are genuinely well-calibrated on unseen data, not merely
+  theoretically motivated.
+- **Calibration curves** across the full probability range confirmed this
+  visually: every target hugs the diagonal closely, with a small, consistent
+  mid-range underconfidence (intervals slightly wider than strictly
+  necessary in the 30–85% band) rather than any dramatic miscalibration.
+- **Sorted prediction-interval plots** show the 95% band visually containing
+  nearly all true values, with misses concentrated at the extremes (very
+  light and very heavy athletes) — consistent with these being the
+  sparsest regions of the training data.
+
+---
+
+### Phases 7–8 *(planned)*
 
 | Phase | Title | Notes |
 |-------|-------|-------|
-| 6 | Bayesian Ridge — Coverage & Calibration Curves | |
 | 7 | Uncertainty Quantification | |
 | 8 | Strength Standards Tool | Interactive tool for coaches and athletes |
 
@@ -230,11 +252,18 @@ individual cells out of order.
 | XGBoost, untuned | Total | + Age | 82.2 kg |
 | XGBoost, Optuna-tuned | Total | Base | 89.1 kg |
 | XGBoost, Optuna-tuned | Total | + Age | **81.4 kg** |
+| BayesianRidge (point estimate) | Total | Base | ≈ Ridge |
+| BayesianRidge (point estimate) | Total | + Age | ≈ Ridge |
+
+BayesianRidge's point predictions are numerically identical to Ridge (see
+Phase 6); its contribution is calibrated uncertainty, not improved accuracy —
+95% coverage measured at 93.7–95.4% across all eight target/variant
+combinations.
 
 All scratch implementations validated against sklearn to four decimal places.
 Per-lift (squat / bench / deadlift) results, subgroup breakdowns, and
-diagnostic plots — including the SHAP age-dependence analysis — available in
-the notebook.
+diagnostic plots — including SHAP age-dependence and Bayesian calibration
+curves — available in the notebook.
 
 ---
 
