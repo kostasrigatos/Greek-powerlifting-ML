@@ -9,11 +9,43 @@ profile. The project is structured around eight phases, three modelling
 approaches, and a strength standards tool that a coach or athlete can run
 interactively.
 
-**Status:** Phases 1–7 complete. Phase 8 (Strength Standards Tool) next —
-the final phase.
+**Status:** Phases 1–7 complete. Phase 8 (Strength Standards Tool) in
+progress — the final phase.
 
 **Data:** OpenPowerlifting, 2026-08-01 release (CC BY 4.0).
 Fetch instructions below — the raw CSV is not committed (> 700 MB).
+
+**Looking for a plain-language explanation instead?** See
+[`ATHLETES.md`](ATHLETES.md) — no formulas, just what the tool tells you and
+how to use it.
+
+---
+
+## Three findings, in pictures
+
+**Greek raw lifters perform comparably to their regional peers — once the
+data is cleaned properly.** The raw data mixed bench-only, push-pull, and
+full-power meets into a single "Total" column, producing a spurious bimodal
+distribution. After restricting to full-power (SBD) competitions, Greece
+sits almost on top of Southern Europe and the Balkans on every lift:
+
+![Comparative KDE](plots/phase1/comparative_kde_all_targets.png)
+
+**Age's effect on performance is genuinely non-linear — confirmed, not just
+assumed.** A linear model can only fit age as a straight line; SHAP values
+extracted from the tuned gradient-boosted model show the actual shape: a
+steep rise through the mid-20s, a plateau through the early 30s, and a
+consistent decline thereafter.
+
+![SHAP Age dependence](plots/phase5/shap_dependence_age_TotalKg.png)
+
+**The uncertainty intervals are honest, not just claimed.** A calibration
+curve compares the coverage a model *claims* (x-axis) against what it
+*actually delivers* on held-out data (y-axis). A well-calibrated model hugs
+the diagonal — which is what the age-augmented BayesianRidge model does
+here, across the full range of confidence levels.
+
+![Calibration curve](plots/phase6/bayesian_ridge_calibration_age.png)
 
 ---
 
@@ -22,7 +54,8 @@ Fetch instructions below — the raw CSV is not committed (> 700 MB).
 ```
 .
 ├── greek_powerlifting_analysis.ipynb   ← main notebook
-├── README.md                           ← this file
+├── README.md                           ← this file (technical)
+├── ATHLETES.md                         ← plain-language explainer
 ├── plots/
 │   ├── phase1/                         ← EDA figures
 │   ├── phase2/                         ← preprocessing figures
@@ -101,13 +134,12 @@ from overfitting.
 **Approach and findings:**
 - **Sex-stratified performance:** RMSE is lower for female lifters across
   every target (smaller absolute totals), but R² is markedly worse and
-  negative for several base-feature targets (squat −0.023, bench −0.133) —
-  the model explains comparatively little of the variance within the female
-  subgroup, even though absolute errors look reasonable.
+  negative for several base-feature targets — the model explains
+  comparatively little of the variance within the female subgroup, even
+  though absolute errors look reasonable.
 - **Age-category performance:** the Masters subgroup is poorly explained
-  under both base (RMSE 107.1 kg, R² = 0.247) and age-augmented (RMSE
-  116.0 kg, R² = 0.038) features — consistent with small sample size
-  (33–35 rows) rather than a missing feature.
+  under both feature sets, consistent with small sample size (33–35 rows)
+  rather than a missing feature.
 - **Bias-variance diagnosis:** training RMSE and CV RMSE are close across
   every target and feature variant — the model is in a high-bias, not
   high-variance, regime.
@@ -134,11 +166,9 @@ as a straight line, but a tree-based model can capture via threshold splits.
   sampler) widened these gains further. *Disclosed caveat: the search
   optimises against the same CV folds used to report results — a mild
   leakage likely making the reported improvement a modest overestimate.*
-- **SHAP analysis** confirmed the age-nonlinearity hypothesis directly: Age
-  ranks third in importance across all four targets, and SHAP dependence
-  plots show the predicted shape explicitly — a steep rise through the
-  mid-20s, a plateau through the early 30s, and a consistent decline
-  thereafter, across all four targets.
+- **SHAP analysis** confirmed the age-nonlinearity hypothesis directly (see
+  figure above): Age ranks third in importance across all four targets, and
+  SHAP dependence plots show the predicted shape explicitly.
 
 ---
 
@@ -158,10 +188,7 @@ honest sense of how much to trust that number.
 - **Empirical coverage** at four nominal levels (50/68/80/95%), across all
   eight target/variant combinations, tracked nominal levels closely (within
   1–5 percentage points) — the intervals are genuinely well-calibrated on
-  unseen data.
-- **Calibration curves** confirmed this visually across the full
-  probability range, with a small, consistent mid-range underconfidence
-  rather than any dramatic miscalibration.
+  unseen data (see figure above).
 
 ---
 
@@ -180,30 +207,30 @@ residuals.
 - **Split-conformal prediction** wrapped around tuned XGBoost for all eight
   target/variant combinations, using the exact finite-sample quantile
   correction $k = \lceil(n_{\text{cal}}+1)(1-\alpha)\rceil$, calibrated on a
-  fresh 50/50 stratified split of each existing test set (never touched
-  during model training or tuning).
+  fresh 50/50 stratified split of each existing test set.
 - **A systematic male/female coverage asymmetry** emerged across all eight
   combinations, with no exceptions: female coverage exceeded male at every
-  confidence level, reaching 100% at the 95% level in nearly every case —
-  driven by a single pooled calibration quantile dominated by the majority
-  (male) group's error scale. Bench showed the widest gap of the three lifts
-  (a 34.7-point male/female split at the 50% level).
+  confidence level — driven by a single pooled calibration quantile
+  dominated by the majority (male) group's error scale. Bench showed the
+  widest gap of the three lifts (34.7 points at the 50% level).
 - **The same asymmetry was independently confirmed under BayesianRidge**,
   establishing it as a property of the dataset's sex-scale heterogeneity,
   not an artifact of either uncertainty method.
 - **BayesianRidge vs. conformal-XGBoost comparison:** conformal intervals
   were narrower in 30 of 32 target/variant/confidence-level combinations,
   with comparable or better coverage — most plausibly because XGBoost's
-  residuals are simply better than Ridge's, not because conformal methods
-  are generally superior to Bayesian ones.
+  residuals are simply better than Ridge's.
 
 ---
 
-### Phase 8 — Strength Standards Tool *(planned)*
+### Phase 8 — Strength Standards Tool *(in progress)*
 
-| Phase | Title | Notes |
-|-------|-------|-------|
-| 8 | Strength Standards Tool | Interactive tool for coaches and athletes — final phase |
+An interactive cell for athletes and coaches. Given bodyweight, sex, age,
+and federation, the tool produces two independent estimates of total —
+one predicted directly, one summed from separate squat/bench/deadlift
+predictions, as a built-in consistency check — each reported with a
+calibrated uncertainty interval from Phases 6–7. Uses the age-augmented
+tuned XGBoost models exclusively, since age is a required input.
 
 ---
 
@@ -267,12 +294,12 @@ individual cells out of order.
 | XGBoost, Optuna-tuned | Total | Base | 89.1 kg |
 | XGBoost, Optuna-tuned | Total | + Age | **81.4 kg** |
 
-**Uncertainty quantification (TotalKg, base features, 95% nominal):**
+**Uncertainty quantification (TotalKg, age-augmented, 95% nominal):**
 
 | Method | Interval half-width | Overall coverage | Male | Female |
 |--------|---------------------|-------------------|------|--------|
-| BayesianRidge (on Ridge) | ± 180.2 kg | 94.1% | 92.6% | 100.0% |
-| Split-conformal (on tuned XGBoost) | ± 186.0 kg | 95.8% | 94.8% | 100.0% |
+| BayesianRidge (on Ridge) | ± 174.9 kg | 95.4% | 95.2% | 96.0% |
+| Split-conformal (on tuned XGBoost) | ± 162.4 kg | 94.5% | 93.1% | 100.0% |
 
 The male/female coverage asymmetry above is systematic — present at every
 confidence level, across all eight target/variant combinations, and under
