@@ -9,8 +9,8 @@ profile. The project is structured around eight phases, three modelling
 approaches, and a strength standards tool that a coach or athlete can run
 interactively.
 
-**Status:** Phases 1–6 complete. Phase 7 (Uncertainty Quantification) next.
-Phase 8 planned.
+**Status:** Phases 1–7 complete. Phase 8 (Strength Standards Tool) next —
+the final phase.
 
 **Data:** OpenPowerlifting, 2026-08-01 release (CC BY 4.0).
 Fetch instructions below — the raw CSV is not committed (> 700 MB).
@@ -107,14 +107,13 @@ from overfitting.
 - **Age-category performance:** the Masters subgroup is poorly explained
   under both base (RMSE 107.1 kg, R² = 0.247) and age-augmented (RMSE
   116.0 kg, R² = 0.038) features — consistent with small sample size
-  (33–35 rows) and within-category heterogeneity (Masters spans 40–70+)
-  rather than a missing feature.
+  (33–35 rows) rather than a missing feature.
 - **Bias-variance diagnosis:** training RMSE and CV RMSE are close across
-  every target and feature variant (gaps of 0.06–0.43 kg) — the model is in
-  a high-bias, not high-variance, regime.
+  every target and feature variant — the model is in a high-bias, not
+  high-variance, regime.
 - **Residual correlation:** squat-deadlift residuals correlate most
-  strongly (0.80), squat-bench next (0.75), bench-deadlift weakest (0.69) —
-  the model's errors are shared across lifts, not independent per lift.
+  strongly (0.80), consistent with the model's errors being shared across
+  lifts rather than independent per lift.
 
 ---
 
@@ -122,12 +121,10 @@ from overfitting.
 **Goal:** explore whether a model with more functional flexibility than a
 linear one can improve on Phase 3–4's classical results.
 
-**Motivation:** Phase 4 established the linear models were underfitting
-(high bias, not high variance). A specific mechanism was hypothesised: the
-relationship between age and performance is plausibly non-monotonic — young
-lifters improving rapidly, a plateau in the late 20s to 30s, then decline —
-a shape a linear model can only fit as a straight line, but a tree-based
-model can capture via threshold splits.
+**Motivation:** Phase 4 established the linear models were underfitting.
+A specific mechanism was hypothesised: the relationship between age and
+performance is plausibly non-monotonic — a shape a linear model can only fit
+as a straight line, but a tree-based model can capture via threshold splits.
 
 **Approach and findings:**
 - **Baseline (untuned) XGBoost vs. OLS/Ridge:** untuned boosting already
@@ -136,60 +133,77 @@ model can capture via threshold splits.
 - **Optuna hyperparameter tuning** (100 trials per target/variant, TPE
   sampler) widened these gains further. *Disclosed caveat: the search
   optimises against the same CV folds used to report results — a mild
-  leakage likely making the reported improvement a modest overestimate. A
-  fully isolated nested-CV estimate was judged not worth the added
-  complexity for this project.*
+  leakage likely making the reported improvement a modest overestimate.*
 - **SHAP analysis** confirmed the age-nonlinearity hypothesis directly: Age
   ranks third in importance across all four targets, and SHAP dependence
   plots show the predicted shape explicitly — a steep rise through the
   mid-20s, a plateau through the early 30s, and a consistent decline
-  thereafter, consistently across all four targets.
+  thereafter, across all four targets.
 
 ---
 
 ### Phase 6 — Bayesian Ridge: Coverage & Calibration ✓
 **Goal:** move beyond point predictions and quantify per-prediction
-uncertainty. Standard Ridge gives a single number (e.g. TotalKg = 575 kg)
-with no indication of confidence; BayesianRidge gives a mean plus a
-calibrated interval (575 ± 15 kg).
+uncertainty. Standard Ridge gives a single number with no indication of
+confidence; BayesianRidge gives a mean plus a calibrated interval.
 
 **Motivation:** Phase 5 produced a model that predicts well but still
-returns only a point estimate per athlete. Useful interpretation — for a
-coach or athlete, and for the strength standards tool planned in Phase 8 —
-needs an honest sense of how much to trust that number.
+returns only a point estimate per athlete. Useful interpretation needs an
+honest sense of how much to trust that number.
 
 **Approach and findings:**
-- **BayesianRidge fitted on all eight target/variant combinations**, with
-  regularisation and noise precision estimated via evidence maximisation
-  rather than cross-validation. The noise-std estimates (e.g. 91.85 kg for
-  base TotalKg) closely match Phase 3's independently-derived CV RMSE
-  (92.17 kg) — a cross-check via a completely different method.
 - **MAP-Ridge identity verified numerically:** at matched λ, BayesianRidge
-  and Ridge coefficients agree to ~1e-12 — confirms BayesianRidge changes
-  nothing about the point prediction, only adds calibrated uncertainty
-  around it.
-- **Empirical coverage** at four nominal levels (50/68/80/95%) on the held-
-  out test set, across all eight target/variant combinations, tracked
-  nominal levels closely (within 1–5 percentage points at every level) —
-  the intervals are genuinely well-calibrated on unseen data, not merely
-  theoretically motivated.
-- **Calibration curves** across the full probability range confirmed this
-  visually: every target hugs the diagonal closely, with a small, consistent
-  mid-range underconfidence (intervals slightly wider than strictly
-  necessary in the 30–85% band) rather than any dramatic miscalibration.
-- **Sorted prediction-interval plots** show the 95% band visually containing
-  nearly all true values, with misses concentrated at the extremes (very
-  light and very heavy athletes) — consistent with these being the
-  sparsest regions of the training data.
+  and Ridge coefficients agree to ~1e-12 — BayesianRidge changes nothing
+  about the point prediction, only adds calibrated uncertainty around it.
+- **Empirical coverage** at four nominal levels (50/68/80/95%), across all
+  eight target/variant combinations, tracked nominal levels closely (within
+  1–5 percentage points) — the intervals are genuinely well-calibrated on
+  unseen data.
+- **Calibration curves** confirmed this visually across the full
+  probability range, with a small, consistent mid-range underconfidence
+  rather than any dramatic miscalibration.
 
 ---
 
-### Phases 7–8 *(planned)*
+### Phase 7 — Uncertainty Quantification ✓
+**Goal:** give a rigorous, calibrated notion of uncertainty to the model
+actually established as best — tuned XGBoost — since Phase 6's BayesianRidge
+was built on Ridge, a model Phase 5 had already shown was beaten on every
+target.
+
+**Motivation:** conformal prediction is model-agnostic and distribution-free,
+requiring no analytic posterior or Gaussian error assumption — it wraps
+directly around tuned XGBoost's predictions using only empirical calibration
+residuals.
+
+**Approach and findings:**
+- **Split-conformal prediction** wrapped around tuned XGBoost for all eight
+  target/variant combinations, using the exact finite-sample quantile
+  correction $k = \lceil(n_{\text{cal}}+1)(1-\alpha)\rceil$, calibrated on a
+  fresh 50/50 stratified split of each existing test set (never touched
+  during model training or tuning).
+- **A systematic male/female coverage asymmetry** emerged across all eight
+  combinations, with no exceptions: female coverage exceeded male at every
+  confidence level, reaching 100% at the 95% level in nearly every case —
+  driven by a single pooled calibration quantile dominated by the majority
+  (male) group's error scale. Bench showed the widest gap of the three lifts
+  (a 34.7-point male/female split at the 50% level).
+- **The same asymmetry was independently confirmed under BayesianRidge**,
+  establishing it as a property of the dataset's sex-scale heterogeneity,
+  not an artifact of either uncertainty method.
+- **BayesianRidge vs. conformal-XGBoost comparison:** conformal intervals
+  were narrower in 30 of 32 target/variant/confidence-level combinations,
+  with comparable or better coverage — most plausibly because XGBoost's
+  residuals are simply better than Ridge's, not because conformal methods
+  are generally superior to Bayesian ones.
+
+---
+
+### Phase 8 — Strength Standards Tool *(planned)*
 
 | Phase | Title | Notes |
 |-------|-------|-------|
-| 7 | Uncertainty Quantification | |
-| 8 | Strength Standards Tool | Interactive tool for coaches and athletes |
+| 8 | Strength Standards Tool | Interactive tool for coaches and athletes — final phase |
 
 ---
 
@@ -252,18 +266,23 @@ individual cells out of order.
 | XGBoost, untuned | Total | + Age | 82.2 kg |
 | XGBoost, Optuna-tuned | Total | Base | 89.1 kg |
 | XGBoost, Optuna-tuned | Total | + Age | **81.4 kg** |
-| BayesianRidge (point estimate) | Total | Base | ≈ Ridge |
-| BayesianRidge (point estimate) | Total | + Age | ≈ Ridge |
 
-BayesianRidge's point predictions are numerically identical to Ridge (see
-Phase 6); its contribution is calibrated uncertainty, not improved accuracy —
-95% coverage measured at 93.7–95.4% across all eight target/variant
-combinations.
+**Uncertainty quantification (TotalKg, base features, 95% nominal):**
+
+| Method | Interval half-width | Overall coverage | Male | Female |
+|--------|---------------------|-------------------|------|--------|
+| BayesianRidge (on Ridge) | ± 180.2 kg | 94.1% | 92.6% | 100.0% |
+| Split-conformal (on tuned XGBoost) | ± 186.0 kg | 95.8% | 94.8% | 100.0% |
+
+The male/female coverage asymmetry above is systematic — present at every
+confidence level, across all eight target/variant combinations, and under
+both uncertainty methods (see Phase 7). It reflects the underlying sex-scale
+heterogeneity in the data, not a flaw specific to either method.
 
 All scratch implementations validated against sklearn to four decimal places.
 Per-lift (squat / bench / deadlift) results, subgroup breakdowns, and
-diagnostic plots — including SHAP age-dependence and Bayesian calibration
-curves — available in the notebook.
+diagnostic plots — including SHAP age-dependence, Bayesian calibration
+curves, and conformal coverage tables — available in the notebook.
 
 ---
 
