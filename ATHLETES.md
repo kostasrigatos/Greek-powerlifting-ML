@@ -12,9 +12,6 @@ behind this? See [`README.md`](README.md).)*
 
 ## How to use the calculator, and how to read your result
 
-*This section will be completed once the interactive tool is finished —
-check back soon.*
-
 **What you'll enter:**
 - Your bodyweight
 - Your sex
@@ -36,11 +33,24 @@ the second number as a useful comparison point, not a fully ranged
 prediction in its own right.
 
 **About the range you'll see next to your number:** the tool doesn't just
-give you a single guess — it gives you a range, like "570 kg, likely
-somewhere between 410 and 730 kg." That range isn't the tool being vague;
-it's the tool being honest. It's telling you how much it actually knows
-based on lifters similar to you in the data, rather than pretending to more
-precision than it has.
+give you a single guess — it gives you a range, like "568.9 kg, likely
+somewhere between 406.5 and 731.2 kg." That range isn't the tool being
+vague; it's the tool being honest. It's telling you how much it actually
+knows based on lifters similar to you in the data, rather than pretending
+to more precision than it has.
+
+**Does it actually work?** I tested it on myself: 90.6 kg bodyweight, 34
+years old, male, HPF. The tool predicted 568.9 kg with a range of roughly
+410–730 kg. My actual competition total at that exact bodyweight and age —
+645 kg — landed comfortably inside that range.
+
+As a broader check, I also looked at every male 93 kg raw lifter across
+three recent HPF competitions in Greece (21 results in total). Of those 21,
+only two — both well above the rest of the field — scored higher than the
+top of the tool's predicted range. Everyone else fell within it. This isn't
+a rigorous scientific test (the lifters span a wide range of ages, not just
+34-year-olds), but it's a reassuring real-world sanity check that the range
+is neither too narrow to be useful nor so wide it means nothing.
 
 **A caveat worth knowing:** the range tends to run wider for women than for
 men. This isn't a flaw specific to you — it's because the dataset simply
@@ -48,6 +58,22 @@ has fewer female competitors than male ones, so the tool has less to learn
 from for that group. We checked this carefully and it holds no matter which
 method we used to calculate the range, which tells us it's a real limit of
 the data, not a mistake in the tool.
+
+As expected given that wider range, I also ran the tool on a real female
+competitor: 65.3 kg bodyweight, 26 years old, competing under GPL. Her
+actual total was 342.5 kg. The tool predicted 338.5 kg — within 4 kg of her
+real result — and her total comfortably fell inside the predicted range.
+The fact that it fell inside isn't a surprise on its own, given how wide
+the range runs for women; the more meaningful part is how close the central
+prediction landed to her actual total.
+
+**About the chart:** the grey shape shows how the totals of real Greek
+lifters similar to you are spread out — taller and wider sections are
+where most results cluster, while the thin edges are rare, exceptional
+results. The line marking your predicted total shows where you'd land in
+that spread, and the box in the corner gives you the same idea as a single
+number (e.g. "62nd percentile" means your predicted total is higher than
+62 out of 100 lifters like you).
 
 ---
 

@@ -9,8 +9,7 @@ profile. The project is structured around eight phases, three modelling
 approaches, and a strength standards tool that a coach or athlete can run
 interactively.
 
-**Status:** Phases 1–7 complete. Phase 8 (Strength Standards Tool) in
-progress — the final phase.
+**Status:** All eight phases complete.
 
 **Data:** OpenPowerlifting, 2026-08-01 release (CC BY 4.0).
 Fetch instructions below — the raw CSV is not committed (> 700 MB).
@@ -62,7 +61,8 @@ here, across the full range of confidence levels.
 │   ├── phase3/                         ← regression figures
 │   ├── phase4/                         ← evaluation figures
 │   ├── phase5/                         ← boosting & SHAP figures
-│   └── phase6/                         ← Bayesian calibration figures
+│   ├── phase6/                         ← Bayesian calibration figures
+│   └── phase8/                         ← strength standards tool output
 └── data/
     └── (raw CSV not committed — see below)
 ```
@@ -223,14 +223,67 @@ residuals.
 
 ---
 
-### Phase 8 — Strength Standards Tool *(in progress)*
+### Phase 8 — Strength Standards Tool ✓
+**Goal:** turn the finished pipeline into something an athlete or coach can
+actually use — bodyweight, sex, age, and federation in; a calibrated total
+prediction out.
 
-An interactive cell for athletes and coaches. Given bodyweight, sex, age,
-and federation, the tool produces two independent estimates of total —
-one predicted directly, one summed from separate squat/bench/deadlift
-predictions, as a built-in consistency check — each reported with a
-calibrated uncertainty interval from Phases 6–7. Uses the age-augmented
-tuned XGBoost models exclusively, since age is a required input.
+**Motivation:** everything built in Phases 1–7 predicts well and knows how
+uncertain it is, but none of it was usable outside a notebook cell full of
+model objects. This phase packages the best model (tuned, age-augmented
+XGBoost) and its calibrated uncertainty (Phase 7's conformal intervals) into
+a single, editable, self-contained cell.
+
+**Approach and findings:**
+- **Two independent predictions** — one direct (age-augmented TotalKg
+  model), one built by summing separate squat/bench/deadlift predictions —
+  as a built-in consistency check on the model itself. Only the direct
+  prediction carries a calibrated interval; the summed total is reported as
+  a point-estimate cross-check only, since combining three positively
+  correlated conformal intervals (squat–deadlift residual correlation 0.80,
+  per Phase 4) is not a simple sum of their individual widths.
+- **The interval is reported at the 95% conformal level**, with a plain-
+  language note that the range was empirically checked against held-out
+  data, not just asserted.
+- **A cohort-context plot** places the prediction against the full
+  same-sex `TotalKg` distribution, answering the question the raw number
+  alone can't: is this an average result, or an exceptional one.
+- **Validated against two real, independent competition results** not seen
+  during training: the author's own 645 kg total (90.6 kg bodyweight, 34,
+  HPF) and a female competitor's 342.5 kg total (65.3 kg bodyweight, 26,
+  HPF) — both fell within their respective predicted ranges. A pooled check
+  across three recent Greek HPF meets in the same weight class (21 results)
+  found only 2 exceeded the top of the predicted range, both well above the
+  rest of the field.
+
+*Full plain-language walkthrough, including both validation examples, in
+[`ATHLETES.md`](ATHLETES.md).*
+
+**The tool in action** — a real run, unedited, for a 90.6 kg, 34-year-old
+male HPF competitor:
+
+```
+===================================================================
+Strength Standard Tool; Greek Raw PL
+===================================================================
+  Athlete:  Male, 90.6 kg, 34, HPF
+===================================================================
+  Individual lift predictions
+  Squat                204.4 kg
+  Bench                135.0 kg
+  Deadlift             231.1 kg
+===================================================================
+  Total predictions
+  Total 1; direct computation of total:                   568.9 ± 162.4 kg
+  Total 2; computed as the sum of the individual lifts:   570.5 kg
+  Difference in the above estimates:                      1.6 kg
+  → The two models are consistent with one another
+===================================================================
+  568.9 kg is likely between 406.5 and 731.2 kg; this range was checked
+  against real results, right about 95% of the time.
+```
+
+![Strength standards tool output](plots/phase8/prediction_M_90.6kg_HPF.png)
 
 ---
 
@@ -273,6 +326,11 @@ pip install numpy pandas matplotlib seaborn scipy scikit-learn xgboost optuna sh
 **Run:** open `greek_powerlifting_analysis.ipynb` in JupyterLab and run all
 cells from top to bottom. Cells have execution dependencies — do not run
 individual cells out of order.
+
+**Try the tool:** the final code cell of Phase 8 is self-contained — edit
+the four `# USER INPUTS` lines at the top (bodyweight, sex, age, federation)
+and run the cell to get a prediction. Do not modify anything below the
+marked line.
 
 ---
 
